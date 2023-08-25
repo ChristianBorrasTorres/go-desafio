@@ -1,94 +1,56 @@
 package main
 
 import (
+	"encoding/csv"
 	"fmt"
 	"log"
 	"os"
-	"strings"
+	"strconv"
 
-	"github.com/aldogayaladh/go-desafio-test/internal/productos"
-)
-
-const (
-	filename = "./productos.csv"
+	"./tickets"
 )
 
 func main() {
-	defer func() {
-		if err := recover(); err != nil {
-			log.Fatal(err)
-		}
-	}()
-
-	var entrada string
-
-	fmt.Print("Ingrese producto a buscar: ")
-
-	_, err := fmt.Scanln(&entrada)
-
-	if err != nil {
-		log.Fatal(err)
-		os.Exit(1)
+	storage := tickets.Storage{
+		Tickets: readTicketsFile("./tickets.csv"),
 	}
 
-	storage := productos.Storage{
-		Productos: readFile(filename),
-	}
+	totalTickets, _ := storage.GetTotalTickets("USA")
+	fmt.Printf("Total tickets to USA: %d\n", totalTickets)
 
-	// Crear canales para comunicarnos con las go rutinas
-	canalProducto := make(chan productos.Producto)
-	defer close(canalProducto)
-	canalErr := make(chan error)
-	defer close(canalErr)
+	countMorning, _ := storage.GetCountByPeriod("mañana")
+	fmt.Printf("Total tickets in the morning: %d\n", countMorning)
 
-	go func(chan productos.Producto, chan error) {
-
-		producto, err := storage.BuscarProductoPorNombre(entrada)
-		if err != nil {
-			canalErr <- err
-			return
-		}
-
-		canalProducto <- producto
-
-	}(canalProducto, canalErr)
-
-	select {
-	case pr := <-canalProducto:
-		fmt.Println(pr)
-	case err := <-canalErr:
-		log.Fatal(err)
-		os.Exit(1)
-	}
-
+	percentage, _ := storage.PercentageDestination("USA", len(storage.Tickets))
+	fmt.Printf("Percentage of tickets to USA: %.2f%%\n", percentage)
 }
 
-// readFile es una funcion que lee un archivo
-func readFile(filename string) []productos.Producto {
-	file, err := os.ReadFile(filename)
-
+func readTicketsFile(filename string) []tickets.Ticket {
+	file, err := os.Open(filename)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
+	}
+	defer file.Close()
+
+	reader := csv.NewReader(file)
+	rawCSVdata, err := reader.ReadAll()
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	data := strings.Split(string(file), "\n")
-
-	var resultado []productos.Producto
-	for i := 0; i < len(data); i++ {
-
-		if len(data[i]) > 0 {
-			file := strings.Split(string(data[i]), ",")
-			producto := productos.Producto{
-				Nombre:      file[0],
-				Descripcion: file[1],
-				Cantidad:    file[2],
-				Precio:      file[3],
-			}
-			resultado = append(resultado, producto)
+	var ticketsList []tickets.Ticket
+	for _, each := range rawCSVdata {
+		price, _ := strconv.ParseFloat(each[5], 64)
+		ticket := tickets.Ticket{
+			ID:           each[0],
+			Nombre:       each[1],
+			Email:        each[2],
+			PaisDestino:  each[3],
+			HoraDelVuelo: each[4],
+			Precio:       price,
 		}
-
+		ticketsList = append(ticketsList, ticket)
 	}
 
-	return resultado
-
+	return ticketsList
 }
