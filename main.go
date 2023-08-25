@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"sync"
 
 	"./tickets"
 )
@@ -15,14 +16,46 @@ func main() {
 		Tickets: readTicketsFile("./tickets.csv"),
 	}
 
-	totalTickets, _ := storage.GetTotalTickets("USA")
-	fmt.Printf("Total tickets to USA: %d\n", totalTickets)
+	var wg sync.WaitGroup
 
-	countMorning, _ := storage.GetCountByPeriod("mañana")
-	fmt.Printf("Total tickets in the morning: %d\n", countMorning)
+	// Requerimiento 1
+	wg.Add(1)
+	go func() {
+		totalTickets, err := storage.GetTotalTickets("USA")
+		if err != nil {
+			log.Println(err)
+		} else {
+			fmt.Printf("Total tickets to USA: %d\n", totalTickets)
+		}
+		wg.Done()
+	}()
 
-	percentage, _ := storage.PercentageDestination("USA", len(storage.Tickets))
-	fmt.Printf("Percentage of tickets to USA: %.2f%%\n", percentage)
+	// Requerimiento 2
+	wg.Add(1)
+	go func() {
+		countMorning, err := storage.GetCountByPeriod("mañana")
+		if err != nil {
+			log.Println(err)
+		} else {
+			fmt.Printf("Total tickets in the morning: %d\n", countMorning)
+		}
+		wg.Done()
+	}()
+
+	// Requerimiento 3
+	wg.Add(1)
+	go func() {
+		percentage, err := storage.PercentageDestination("USA", len(storage.Tickets))
+		if err != nil {
+			log.Println(err)
+		} else {
+			fmt.Printf("Percentage of tickets to USA: %.2f%%\n", percentage)
+		}
+		wg.Done()
+	}()
+
+	// Esperar a que todas las goroutines terminen
+	wg.Wait()
 }
 
 func readTicketsFile(filename string) []tickets.Ticket {
